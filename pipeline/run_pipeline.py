@@ -57,7 +57,7 @@ def main() -> int:
         raise RuntimeError("opcode filter did not report its output directory")
 
     run_directory = Path(match.group(1)).resolve()
-    results_path = run_directory / "results.csv"
+    results_path = run_directory / "openvpn.csv"
     summary_path = run_directory / "flow_summary.txt"
     metadata_path = run_directory / "run_metadata.json"
 

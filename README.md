@@ -42,15 +42,15 @@ From the repository root:
 
 ```bash
 .venv/bin/python pipeline/run_pipeline.py \
-  data/pcap/100sessions.pcap
+  data/pcap/session_100.pcap
 ```
 
 Each run creates one self-contained directory such as:
 
 ```text
-runs/2026-10-20/100sessions__20261020T121457Z/
-├── 100sessions.pcap
-├── results.csv
+runs/2026-10-20/session_100__20261020T174223Z/
+├── session_100.pcap
+├── openvpn.csv
 ├── flow_summary.txt
 └── run_metadata.json
 ```
@@ -64,8 +64,8 @@ terminal also prints every generated path.
 # Detection only
 .venv/bin/python pipeline/openvpn_opcode_filter.py INPUT.pcap
 
-# Summarize an existing detector CSV
-python3 pipeline/flow_summary.py RESULTS.csv
+# Summarize an existing OpenVPN detector CSV
+python3 pipeline/flow_summary.py OPENVPN.csv
 
 # Combine session_N/client.pcap captures into a dataset
 python3 pipeline/combine_session_pcaps.py SOURCE_SESSIONS OUTPUT_DATASET

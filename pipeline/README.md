@@ -1,4 +1,185 @@
-# VPN Traffic Utilities
+# Pipeline command reference
+
+This directory contains the complete workflow for processing a PCAP:
+
+```text
+input .pcap
+    -> OpenVPN opcode flow detection
+    -> openvpn.csv
+    -> human-readable flow_summary.txt
+```
+
+| Goal | Command |
+| --- | --- |
+| Detect flows and generate the summary | `pipeline/run_pipeline.py INPUT.pcap` |
+| Run only opcode detection | `pipeline/openvpn_opcode_filter.py INPUT.pcap` |
+| Summarize an existing detector CSV | `pipeline/flow_summary.py OPENVPN.csv` |
+| Combine numbered session captures | `pipeline/combine_session_pcaps.py SOURCE OUTPUT` |
+
+Run all commands below from the repository root:
+
+```bash
+cd /home/deepaksingh/Documents/vpn-traffic/openvpn-opcode-evaluation
+```
+
+## First-time setup
+
+Python 3 and `dpkt` are required. Create a project-local virtual environment
+and install the pinned dependency:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+The examples use `.venv/bin/python`. You can use `python3` instead when `dpkt`
+is already installed for that interpreter.
+
+## Recommended: run the complete pipeline
+
+`run_pipeline.py` is the normal entry point. It accepts one PCAP path, runs the
+opcode detector, runs the flow summary on the resulting CSV, and records all
+outputs together in a timestamped directory.
+
+Usage:
+
+```text
+python pipeline/run_pipeline.py INPUT.pcap
+```
+
+Example using the PCAP included with this repository:
+
+```bash
+.venv/bin/python pipeline/run_pipeline.py \
+  data/pcap/session_100.pcap
+```
+
+Example using any external capture:
+
+```bash
+.venv/bin/python pipeline/run_pipeline.py \
+  /absolute/path/to/capture.pcap
+```
+
+The command prints the detector counts, summary, and final output paths. A run
+for `capture.pcap` creates a directory similar to:
+
+```text
+runs/2026-10-20/capture__20261020T122411Z/
+├── capture.pcap          Copy of the exact input capture used for this run
+├── openvpn.csv           Flows accepted by the opcode detector
+├── flow_summary.txt      Saved human-readable analysis of openvpn.csv
+└── run_metadata.json     Input path, constants, counts, and run timestamps
+```
+
+`runs/LATEST_RUN.txt` is updated only after the complete pipeline succeeds. It
+contains the repository-relative path of the newest completed run.
+
+To inspect the newest run:
+
+```bash
+cat runs/LATEST_RUN.txt
+```
+
+## Run only the OpenVPN opcode detector
+
+`openvpn_opcode_filter.py` accepts exactly one input PCAP. It processes packets
+in capture order, groups both directions of a TCP/UDP conversation into one
+flow, extracts OpenVPN opcodes, and evaluates a flow once it obtains its first
+100 opcodes.
+
+Usage:
+
+```text
+python pipeline/openvpn_opcode_filter.py INPUT.pcap
+```
+
+Example:
+
+```bash
+.venv/bin/python pipeline/openvpn_opcode_filter.py \
+  data/pcap/session_100.pcap
+```
+
+An absolute input path works as well:
+
+```bash
+.venv/bin/python pipeline/openvpn_opcode_filter.py \
+  /home/deepaksingh/Documents/vpn-traffic/data/pcap/combined_client_traffic_cleaned.pcap
+```
+
+The detector automatically creates a unique directory under
+`runs/YYYY-MM-DD/`, using the current UTC date and timestamp. It copies the
+input PCAP into that directory and writes:
+
+- `openvpn.csv` — one row per flow accepted by the opcode rule.
+- `run_metadata.json` — source/input details, filter constants, and counts.
+- `<input-name>.pcap` — the copied input used for reproducibility.
+
+The detector-only command does **not** create `flow_summary.txt` and does not
+update `runs/LATEST_RUN.txt`; use `run_pipeline.py` when you want those steps.
+
+Its terminal summary has this form:
+
+```text
+total flows seen: 100, flows that reached 100 opcodes: 100, flows flagged: 100, output directory: /.../runs/YYYY-MM-DD/session_100__TIMESTAMP
+```
+
+This shows the format using the repository's current sample data; counts and
+the timestamp depend on the input PCAP and execution time.
+
+### Detector output CSV
+
+`openvpn.csv` has these columns:
+
+```text
+proto,client_ip,client_port,server_ip,server_port,n_eval,unique_opcodes,first_opcode,last_opcode,opcode_sequence
+```
+
+Example row (the opcode sequence is shortened here only for readability):
+
+```csv
+proto,client_ip,client_port,server_ip,server_port,n_eval,unique_opcodes,first_opcode,last_opcode,opcode_sequence
+UDP,10.184.106.251,42741,10.208.23.185,1194,100,4,7,9,7|4|4|5|...|9
+```
+
+Important meanings:
+
+- `client_*` is the first-seen sender for the direction-normalized flow.
+- `server_*` is the opposite endpoint; these labels do not independently prove
+  application roles.
+- `n_eval` is the 100-opcode decision window.
+- `unique_opcodes` is the number of distinct opcodes in that window.
+- `first_opcode` and `last_opcode` are the first and 100th opcodes.
+- `opcode_sequence` contains all 100 opcodes separated by `|`.
+
+TCP streams are reassembled per direction before length-prefixed OpenVPN
+records are parsed. UDP contributes at most one opcode per non-empty datagram.
+After a flow reaches the decision window, later packets for that flow are
+ignored. Flows that do not reach 100 opcodes do not appear in `openvpn.csv`.
+
+## Generate or rerun a flow summary
+
+To print a summary for an existing detector CSV:
+
+```bash
+.venv/bin/python pipeline/flow_summary.py \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv"
+```
+
+To save the same terminal output to a text file:
+
+```bash
+.venv/bin/python pipeline/flow_summary.py \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
+  > flow_summary.txt
+```
+
+The summary always includes a `CONTROLLED TRAFFIC` section for flows involving
+the configured controlled server `10.208.23.185`, followed by the associated
+client IPs and their flow counts. The command also supports role-neutral IP
+inspection, user-assigned endpoint roles, port filters, detailed tables, and
+endpoint CSV exports, documented below.
 
 ## Combine session PCAPs
 
@@ -7,17 +188,35 @@ numeric session ID, appends each `client.pcap` in that exact order, and writes
 a JSON manifest. The combined capture is stored in the output directory's
 `pcap/` subdirectory.
 
+Usage:
+
+```text
+python pipeline/combine_session_pcaps.py SOURCE_DIRECTORY OUTPUT_DIRECTORY [OPTIONS]
+```
+
+Example:
+
 ```bash
-python3 pipeline/combine_session_pcaps.py \
+.venv/bin/python pipeline/combine_session_pcaps.py \
   /path/to/sessions \
   /path/to/combined_dataset
 ```
 
-Existing output files are protected by default. Pass `--overwrite` to replace
-them, or use `--help` to see the input/output filename options. Wireshark's
-`mergecap` and `capinfos` command-line tools must be installed.
+Custom input and output names:
 
-## Flow Summary
+```bash
+.venv/bin/python pipeline/combine_session_pcaps.py \
+  /path/to/sessions \
+  /path/to/combined_dataset \
+  --input-name client.pcap \
+  --output-name combined_sessions.pcap
+```
+
+Existing output files are protected by default. Pass `--overwrite` to replace
+them, or use `--help` to see all options. Wireshark's `mergecap` and `capinfos`
+command-line tools must be installed for this utility.
+
+## Flow-summary filters and exports
 
 `flow_summary.py` analyzes the flow-level CSV files produced by this project.
 It prints raw counts and tables to the terminal. It does not require pandas or
@@ -27,32 +226,17 @@ The script treats the CSV's `client_*` and `server_*` columns as neutral
 endpoints unless you explicitly assign roles with `--client-ip` or
 `--destination-ip`. Role-based filters still match either side of a CSV row.
 
-## Quick start
-
-Run commands from the repository root:
+Show every supported argument:
 
 ```bash
-cd /home/deepaksingh/Documents/vpn-traffic/openvpn-opcode-evaluation
-```
-
-Show command help:
-
-```bash
-python3 pipeline/flow_summary.py --help
-```
-
-Analyze the current example CSV:
-
-```bash
-python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv
+.venv/bin/python pipeline/flow_summary.py --help
 ```
 
 The module form is equivalent:
 
 ```bash
-python3 -m pipeline.flow_summary \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv
+.venv/bin/python -m pipeline.flow_summary \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv"
 ```
 
 ## Common commands
@@ -67,7 +251,7 @@ Example:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv"
 ```
 
 This reports total and unique flows, repeated flow records, exact duplicate
@@ -84,7 +268,7 @@ Example:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --ip 10.184.106.251
 ```
 
@@ -101,7 +285,7 @@ Example:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --client-ip 10.184.106.251
 ```
 
@@ -120,7 +304,7 @@ Example:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --destination-ip 10.208.23.185
 ```
 
@@ -139,7 +323,7 @@ Example:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --client-ip 10.184.106.251 \
   --destination-ip 10.208.23.185
 ```
@@ -153,7 +337,7 @@ Use `--destination-port` with a client or destination filter:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --client-ip 10.184.106.251 \
   --destination-ip 10.208.23.185 \
   --destination-port 1194
@@ -185,7 +369,7 @@ This command prints all destinations and saves the same list:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --client-ip 10.184.106.251 \
   --destinations-csv destinations.csv
 ```
@@ -196,7 +380,7 @@ python3 pipeline/flow_summary.py \
 
 ```bash
 python3 pipeline/flow_summary.py \
-  runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv \
+  "$(cat runs/LATEST_RUN.txt)/openvpn.csv" \
   --ip 10.184.106.251 \
   --peers-csv peers.csv
 ```
@@ -384,7 +568,7 @@ Run the command from the repository root or provide an absolute CSV path:
 
 ```bash
 python3 pipeline/flow_summary.py \
-  /absolute/path/to/opcode_based_filtering_results.csv
+  /absolute/path/to/openvpn.csv
 ```
 
 ### Output file already exists

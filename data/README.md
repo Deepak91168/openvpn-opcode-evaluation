@@ -1,6 +1,6 @@
 # Current input data
 
-`pcap/100sessions.pcap` is the current input capture used
+`pcap/session_100.pcap` is the current input capture used
 by the pipeline. Put source captures here; do not put generated CSVs or reports
 in this directory.
 

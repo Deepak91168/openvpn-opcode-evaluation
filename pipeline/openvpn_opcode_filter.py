@@ -162,7 +162,7 @@ def main():
     created_at = datetime.now(timezone.utc)
     run_directory = make_run_directory(source_path, created_at)
     input_copy = run_directory / source_path.name
-    results_path = run_directory / "results.csv"
+    results_path = run_directory / "openvpn.csv"
     metadata_path = run_directory / "run_metadata.json"
     shutil.copy2(source_path, input_copy)
 
