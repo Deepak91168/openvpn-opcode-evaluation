@@ -1,0 +1,47 @@
+
+INPUT
+-----
+CSV file                     : /home/deepaksingh/Documents/vpn-traffic/runs/2026-10-20/combined_client_traffic_cleaned__20261020T122411Z/results.csv
+CSV rows                     : 100
+Valid TCP/UDP rows           : 100
+
+OVERALL TRAFFIC
+---------------
+Total flow records           : 100
+Unique flow keys             : 100
+Repeated flow records        : 0
+Exact duplicate rows         : 0
+TCP flows                    : 49 (49.0%)
+UDP flows                    : 51 (51.0%)
+Packets collected            : N/A
+Unique IP addresses          : 3
+Unique IP pairs (IP only)    : 2
+Source PCAP files            : 0
+First flow opened            : N/A
+Last flow opened             : N/A
+Flow-opening time span       : N/A
+
+CONTROLLED TRAFFIC
+------------------
+Controlled server IP         : 10.208.23.185
+Controlled flow records      : 100 (100.0%)
+Other flow records           : 0
+Controlled TCP flows         : 49
+Controlled UDP flows         : 51
+Associated client IPs        : 2
+Controlled server ports      : 1
+
+CONTROLLED CLIENT IPS
+---------------------
+CLIENT IP       FLOWS  SHARE  TCP  UDP  CLIENT PORTS
+--------------  -----  -----  ---  ---  ------------
+10.184.103.196  66     66.0%  49   17   66          
+10.184.106.251  34     34.0%  0    34   34          
+
+DATA QUALITY
+------------
+Skipped rows                 : 0
+Repeated flow keys           : 0
+Exact duplicate CSV rows     : 0
+Missing packet counts        : 100
+Missing timestamps           : 100

@@ -1,0 +1,39 @@
+{
+  "run_id": "combined_client_traffic_cleaned__20261020T122411Z",
+  "created_utc": "2026-10-20T12:24:11.565878+00:00",
+  "source_pcap": "/home/deepaksingh/Documents/vpn-traffic/data/pcap/combined_client_traffic_cleaned.pcap",
+  "input_pcap": "combined_client_traffic_cleaned.pcap",
+  "input_size_bytes": 110480602,
+  "results_csv": "results.csv",
+  "filter_constants": {
+    "N": 100,
+    "ACCEPT_MIN": 4,
+    "ACCEPT_MAX": 11,
+    "HANDSHAKE_DONE": 4,
+    "MAX_OVPN_LEN": 2000,
+    "TCP_MAX_INITIAL_WINDOW": 16384,
+    "VALID_OPCODES": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  "summary": {
+    "total_flows_seen": 100,
+    "flows_reaching_100_opcodes": 100,
+    "flows_flagged": 100
+  },
+  "pipeline": {
+    "completed_utc": "2026-10-20T12:24:12.931440+00:00",
+    "runner": "pipeline/run_pipeline.py",
+    "flow_summary": "flow_summary.txt"
+  }
+}

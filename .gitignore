@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+
+# A run keeps a local input copy for reproducibility, but the canonical source
+# capture under data/pcap is the only copy intended for Git LFS.
+runs/**/*.pcap
+runs/**/*.pcapng
